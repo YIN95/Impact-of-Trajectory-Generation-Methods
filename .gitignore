@@ -1,0 +1,13 @@
+**/*.pth.tar
+**/*.swp
+**/__pycache__
+
+**.log
+**.out
+**.npy
+*.DS_Store
+
+.vscode/
+logs/*
+data/*
+runs/*
