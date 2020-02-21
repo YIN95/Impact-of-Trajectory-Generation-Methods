@@ -22,9 +22,12 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg, tra
     for cur_iter, (inputs, labels, _) in enumerate(train_loader):
         # print(cur_iter)
         #if train with RL
-        inputs = inputs.cuda()
+        inputs = inputs.float().cuda()
         labels = labels.cuda()
 
+        if cfg.MODEL.LOSS_FUNC == "cross_entropy":
+            labels = labels.long()
+            
         # Update the learning rate.
         lr = optim.get_cur_lr(cur_epoch + float(cur_iter) / train_size, cfg)
         optim.set_lr(optimizer, lr)
@@ -45,22 +48,31 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg, tra
 
         # Compute the mAP of current mb.
         aps = metrics.compute_multiple_aps(labels.cpu().detach().numpy(),torch.sigmoid(preds).cpu().detach().numpy())
-        cur_map = np.mean([ap for ap in aps if ap>=0])
+        accs = metrics.compute_multiple_precision(labels.cpu().detach().numpy(),torch.sigmoid(preds).cpu().detach().numpy())
 
+        cur_map = np.mean([ap for ap in aps if ap>=0])
+        cur_acc = np.mean([ac for ac in accs if ac>=0])
+        
         if cfg.NUM_GPUS > 1:
-            loss, cur_map = dist.all_reduce([loss, torch.tensor([cur_map]).cuda()])
+            loss, cur_map, cur_acc = dist.all_reduce(
+                [loss, 
+                 torch.tensor([cur_map]).cuda(), 
+                 torch.tensor([cur_acc]).cuda()]
+                )
         
         # Copy the stats from GPU to CPU (sync point).
         cur_map = cur_map.item()
+        cur_acc = cur_acc.item()
         loss = loss.item()
 
         tflogger.add_scalar("loss",loss, train_size*cur_epoch+cur_iter)
         tflogger.add_scalar("train_map",cur_map, train_size*cur_epoch+cur_iter)
+        tflogger.add_scalar("train_acc",cur_acc, train_size*cur_epoch+cur_iter)
 
         train_meter.iter_toc()
         # Update and log stats.
         train_meter.update_stats_map(
-            cur_map, loss, lr, inputs.size(0) * cfg.NUM_GPUS
+            cur_acc, cur_map, loss, lr, inputs.size(0) * cfg.NUM_GPUS
         )
         train_meter.log_iter_stats(cur_epoch, cur_iter)
         
@@ -80,7 +92,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, val_size):
     for cur_iter, (inputs, labels, _) in enumerate(val_loader):
         
         # if eval with RL
-        inputs = inputs.cuda()
+        inputs = inputs.float().cuda()
         labels = labels.cuda()
 
         # Perform the forward pass.

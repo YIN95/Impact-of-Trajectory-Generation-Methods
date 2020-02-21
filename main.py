@@ -17,7 +17,7 @@ def main():
         "--cfg",
         dest="cfg_file",
         help="Path to the config file",
-        default='configs/cater/SLOWFAST.yaml',
+        default='configs/congreg8/config.yaml',
         type=str,
     )
     

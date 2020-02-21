@@ -22,7 +22,7 @@ def multi_view_test(test_loader, model, test_meter, cfg):
     for cur_iter, (inputs, labels, video_idx) in enumerate(test_loader):
         
         # Transfer the data to the current GPU device.
-        inputs = inputs.cuda()
+        inputs = inputs.float().cuda()
         labels = labels.cuda()
         video_idx = video_idx.cuda()
         

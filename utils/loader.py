@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 
 from dataset.data import Data
 from dataset.cater import CATER
-
+from dataset.congreg8 import CongreG8
 
 def get_dataset(cfg, mode):
     """ Get dataset by cfg file and mode.
@@ -21,6 +21,8 @@ def get_dataset(cfg, mode):
         dataset = Data(cfg, mode)
     elif cfg.TRAIN.DATASET == "cater":
         dataset = CATER(cfg, mode)
+    elif cfg.TRAIN.DATASET == "congreg8":
+        dataset = CongreG8(cfg, mode)
     else:
         raise ValueError("No such dataset")
     return dataset

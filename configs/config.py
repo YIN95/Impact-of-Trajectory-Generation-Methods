@@ -277,6 +277,18 @@ _C.DATA.TEST_CROP_SIZE = 256
 
 _C.TASK = 1
 
+
+_C.STGCN = CfgNode()
+_C.STGCN.LAYOUT = 'congreg8-marker'
+_C.STGCN.STRATEGY = 'spatial'
+
+_C.STGCN.MAX_HOP = 1
+_C.STGCN.DILATION = 1
+_C.STGCN.EDGE_IMPORTANCE = True
+_C.STGCN.HIDDEN_FEATURES = 64
+_C.STGCN.OUT_FEATURES = 16
+_C.STGCN.TEMPORAL_KERNEL_SIZE = 9
+
 def check_config(cfg):
     
     # SOLVER assertions

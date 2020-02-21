@@ -30,6 +30,7 @@ class TrainMeter(object):
         # Current minibatch errors (smoothed over a window).
         self.mb_top1_err = ScalarMeter(cfg.LOG_PERIOD)
         self.mb_top5_err = ScalarMeter(cfg.LOG_PERIOD)
+        self.acc = ScalarMeter(cfg.LOG_PERIOD)
         # Number of misclassified examples.
         self.num_top1_mis = 0
         self.num_top5_mis = 0
@@ -37,6 +38,7 @@ class TrainMeter(object):
         # Current mean average precision 
         self.map = ScalarMeter(cfg.LOG_PERIOD)
         self.total_map = 0.0
+        self.total_acc = 0.0
 
     def reset(self):
         """
@@ -51,7 +53,9 @@ class TrainMeter(object):
         self.num_top5_mis = 0
         self.num_samples = 0
         self.map.reset()
+        self.acc.reset()
         self.total_map = 0.0
+        self.total_acc = 0.0
     
     def iter_tic(self):
         """
@@ -85,14 +89,16 @@ class TrainMeter(object):
         self.num_top5_mis += top5_err * mb_size
         self.loss_total += loss * mb_size
         self.num_samples += mb_size
-        
-    def update_stats_map(self, cur_map,loss, lr, mb_size):
+
+    def update_stats_map(self, cur_map, cur_acc, loss, lr, mb_size):
         self.loss.add_value(loss)
         self.lr = lr
         self.loss_total += loss * mb_size
         self.num_samples += mb_size
         self.map.add_value(cur_map)
         self.total_map += cur_map*mb_size
+        self.acc.add_value(cur_acc)
+        self.total_acc += cur_acc*mb_size
     
     def log_iter_stats(self, cur_epoch, cur_iter):
         """
@@ -113,6 +119,7 @@ class TrainMeter(object):
             "iter": "{}/{}".format(cur_iter + 1, self.epoch_iters),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
+            "acc": self.acc.get_win_median(),
             "mAP": self.map.get_win_median(),
             "top1_err": self.mb_top1_err.get_win_median(),
             "top5_err": self.mb_top5_err.get_win_median(),
@@ -133,6 +140,7 @@ class TrainMeter(object):
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
     
         mAP = self.total_map / self.num_samples
+        acc = self.total_acc / self.num_samples
         top1_err = self.num_top1_mis / self.num_samples
         top5_err = self.num_top5_mis / self.num_samples
         avg_loss = self.loss_total / self.num_samples
@@ -141,6 +149,7 @@ class TrainMeter(object):
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
+            "acc": acc,
             "mAP": mAP,
             "top1_err": top1_err,
             "top5_err": top5_err,
@@ -519,6 +528,65 @@ def topk_accuracies(preds, labels, ks):
     num_topks_correct = topks_correct(preds, labels, ks)
     return [(x / preds.size(0)) * 100.0 for x in num_topks_correct]
 
+def compute_precision(groundtruth, predictions):
+    predictions = np.asarray(predictions).squeeze()
+    groundtruth = np.asarray(groundtruth, dtype=float).squeeze()
+    if predictions.ndim != 1:
+        raise ValueError('Predictions vector should be 1 dimensional.'
+                         'For multiple labels, use `compute_multiple_aps`.')
+    if groundtruth.ndim != 1:
+        raise ValueError('Groundtruth vector should be 1 dimensional.'
+                         'For multiple labels, use `compute_multiple_aps`.')
+
+    sorted_indices = np.argsort(predictions)[::-1]
+    predictions = predictions[sorted_indices]
+    groundtruth = groundtruth[sorted_indices]
+    # The false positives are all the negative groundtruth instances, since we
+    # assume all instances were 'retrieved'. Ideally, these will be low scoring
+    # and therefore in the end of the vector.
+    false_positives = 1 - groundtruth
+
+    tp = np.cumsum(groundtruth)      # tp[i] = # of positive examples up to i
+    fp = np.cumsum(false_positives)  # fp[i] = # of false positives up to i
+
+    num_positives = tp[-1]
+
+    precisions = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
+    
+    return precisions
+
+
+def compute_multiple_precision(groundtruth, predictions):
+    """Convenience function to compute APs for multiple labels.
+    Args:
+        groundtruth (np.array): Shape (num_samples, num_labels)
+        predictions (np.array): Shape (num_samples, num_labels)
+    Returns:
+        aps_per_label (np.array, shape (num_labels,)): Contains APs for each
+            label. NOTE: If a label does not have positive samples in the
+            groundtruth, the AP is set to -1.
+    """
+    predictions = np.asarray(predictions)
+    groundtruth = np.asarray(groundtruth)
+    groundtruth = groundtruth.reshape((groundtruth.shape[0], -1))
+    if predictions.ndim != 2:
+        raise ValueError('Predictions should be 2-dimensional,'
+                         ' but has shape %s' % (predictions.shape, ))
+    if groundtruth.ndim != 2:
+        raise ValueError('Groundtruth should be 2-dimensional,'
+                         ' but has shape %s' % (predictions.shape, ))
+
+    num_labels = groundtruth.shape[1]
+    aps = np.zeros(groundtruth.shape[1])
+    for i in range(num_labels):
+        if not groundtruth[:, i].any():
+            # print('WARNING: No groundtruth for label: %s' % i)
+            aps[i] = 0
+        else:
+            aps[i] = np.average(compute_precision(groundtruth[:, i],
+                                               predictions[:, i]))
+    return aps
+
 
 def compute_average_precision(groundtruth, predictions):
     """
@@ -594,6 +662,7 @@ def compute_multiple_aps(groundtruth, predictions):
     """
     predictions = np.asarray(predictions)
     groundtruth = np.asarray(groundtruth)
+    groundtruth = groundtruth.reshape((groundtruth.shape[0], -1))
     if predictions.ndim != 2:
         raise ValueError('Predictions should be 2-dimensional,'
                          ' but has shape %s' % (predictions.shape, ))
