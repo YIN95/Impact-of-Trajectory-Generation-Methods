@@ -4,7 +4,6 @@ from torch.utils.data.sampler import RandomSampler
 from torch.utils.data import DataLoader
 
 from dataset.data import Data
-from dataset.cater import CATER
 from dataset.congreg8 import CongreG8
 
 def get_dataset(cfg, mode):

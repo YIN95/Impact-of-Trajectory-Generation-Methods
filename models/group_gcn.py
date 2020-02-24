@@ -40,7 +40,7 @@ class Group_GCN(nn.Module):
         else:
             self.edge_importance = [1] * len(self.st_gcn_networks)
         
-        hidden = int(cfg.STGCN.HIDDEN_FEATURES / 2)
+        hidden = 8
         self.fcn = nn.Conv2d(64, hidden, kernel_size=1)
         self.fc1 = nn.Linear(hidden, 2)
 

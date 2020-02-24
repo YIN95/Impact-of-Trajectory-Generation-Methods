@@ -45,34 +45,22 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg, tra
         loss.backward()
         # Update the parameters.
         optimizer.step()
-
-        # Compute the mAP of current mb.
-        aps = metrics.compute_multiple_aps(labels.cpu().detach().numpy(),torch.sigmoid(preds).cpu().detach().numpy())
-        accs = metrics.compute_multiple_precision(labels.cpu().detach().numpy(),torch.sigmoid(preds).cpu().detach().numpy())
-
-        cur_map = np.mean([ap for ap in aps if ap>=0])
-        cur_acc = np.mean([ac for ac in accs if ac>=0])
         
+        num_topks_correct = metrics.topks_correct(preds, labels, (1,))
+        top1_acc = (num_topks_correct[0] / preds.size(0)) * 100.0
+    
         if cfg.NUM_GPUS > 1:
-            loss, cur_map, cur_acc = dist.all_reduce(
-                [loss, 
-                 torch.tensor([cur_map]).cuda(), 
-                 torch.tensor([cur_acc]).cuda()]
-                )
+            loss, top1_acc = dist.all_reduce([loss, top1_acc])
         
-        # Copy the stats from GPU to CPU (sync point).
-        cur_map = cur_map.item()
-        cur_acc = cur_acc.item()
-        loss = loss.item()
+        loss, top1_acc = loss.item(), top1_acc.item()
 
         tflogger.add_scalar("loss",loss, train_size*cur_epoch+cur_iter)
-        tflogger.add_scalar("train_map",cur_map, train_size*cur_epoch+cur_iter)
-        tflogger.add_scalar("train_acc",cur_acc, train_size*cur_epoch+cur_iter)
+        tflogger.add_scalar("train_top1_acc",top1_acc, train_size*cur_epoch+cur_iter)
 
         train_meter.iter_toc()
         # Update and log stats.
-        train_meter.update_stats_map(
-            cur_acc, cur_map, loss, lr, inputs.size(0) * cfg.NUM_GPUS
+        train_meter.update_stats_topk(
+            top1_acc, loss, lr, inputs.size(0) * cfg.NUM_GPUS
         )
         train_meter.log_iter_stats(cur_epoch, cur_iter)
         
@@ -98,20 +86,26 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, val_size):
         # Perform the forward pass.
         preds = model(inputs)
         
-        # Compute the mAP of current mb.
-        aps = metrics.compute_multiple_aps(labels.cpu().detach().numpy(), torch.sigmoid(preds).cpu().detach().numpy())
-        cur_map = np.mean([ap for ap in aps if ap>=0])
+        loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)()
 
+        # Compute the loss.
+        loss = loss_fun(preds, labels)
+        
+        # Compute the mAP of current mb.
+        num_topks_correct = metrics.topks_correct(preds, labels, (1,))
+        top1_acc = (num_topks_correct[0] / preds.size(0)) * 100.0
+    
         if cfg.NUM_GPUS > 1:
-            cur_map = dist.all_reduce(torch.tensor([cur_map]).cuda())
-        # Copy the stats from GPU to CPU (sync point).
-        cur_map = cur_map.item()
+            loss, top1_acc = dist.all_reduce([loss, top1_acc])
+        
+        loss, top1_acc = loss.item(), top1_acc.item()
+        
         val_meter.iter_toc()
         # Update and log stats.
-        val_meter.update_stats_map(
-            cur_map, inputs.size(0) * cfg.NUM_GPUS
+        val_meter.update_stats_topk(
+            top1_acc, inputs.size(0) * cfg.NUM_GPUS
         )
-        val_meter.log_iter_stats(cur_epoch, cur_iter)       
+        val_meter.log_iter_stats(cur_epoch, cur_iter)
         val_meter.iter_tic()
     
     # Log epoch stats.

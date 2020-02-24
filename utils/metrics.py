@@ -28,16 +28,14 @@ class TrainMeter(object):
         self.loss_total = 0.0
         self.lr = None
         # Current minibatch errors (smoothed over a window).
-        self.mb_top1_err = ScalarMeter(cfg.LOG_PERIOD)
-        self.mb_top5_err = ScalarMeter(cfg.LOG_PERIOD)
+        self.mb_top1_acc= ScalarMeter(cfg.LOG_PERIOD)
         self.acc = ScalarMeter(cfg.LOG_PERIOD)
-        # Number of misclassified examples.
-        self.num_top1_mis = 0
-        self.num_top5_mis = 0
+
+        self.num_top1_correct = 0
         self.num_samples = 0
+
         # Current mean average precision 
         self.map = ScalarMeter(cfg.LOG_PERIOD)
-        self.total_map = 0.0
         self.total_acc = 0.0
 
     def reset(self):
@@ -47,14 +45,12 @@ class TrainMeter(object):
         self.loss.reset()
         self.loss_total = 0.0
         self.lr = None
-        self.mb_top1_err.reset()
-        self.mb_top5_err.reset()
-        self.num_top1_mis = 0
-        self.num_top5_mis = 0
+        self.mb_top1_acc.reset()
+
+        self.num_top1_correct = 0
         self.num_samples = 0
         self.map.reset()
         self.acc.reset()
-        self.total_map = 0.0
         self.total_acc = 0.0
     
     def iter_tic(self):
@@ -69,7 +65,7 @@ class TrainMeter(object):
         """
         self.iter_timer.pause()
     
-    def update_stats_topk(self, top1_err, top5_err, loss, lr, mb_size):
+    def update_stats_topk(self, top1_acc, loss, lr, mb_size):
         """
         Update the current stats.
         Args:
@@ -80,13 +76,11 @@ class TrainMeter(object):
             mb_size (int): mini batch size.
         """
         # Current minibatch stats
-        self.mb_top1_err.add_value(top1_err)
-        self.mb_top5_err.add_value(top5_err)
+        self.mb_top1_acc.add_value(top1_acc)
         self.loss.add_value(loss)
         self.lr = lr
         # Aggregate stats
-        self.num_top1_mis += top1_err * mb_size
-        self.num_top5_mis += top5_err * mb_size
+        self.num_top1_correct += top1_acc * mb_size
         self.loss_total += loss * mb_size
         self.num_samples += mb_size
 
@@ -119,10 +113,7 @@ class TrainMeter(object):
             "iter": "{}/{}".format(cur_iter + 1, self.epoch_iters),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "acc": self.acc.get_win_median(),
-            "mAP": self.map.get_win_median(),
-            "top1_err": self.mb_top1_err.get_win_median(),
-            "top5_err": self.mb_top5_err.get_win_median(),
+            "top1_acc": self.mb_top1_acc.get_win_median(),
             "loss": self.loss.get_win_median(),
             "lr": self.lr,
         }
@@ -139,20 +130,17 @@ class TrainMeter(object):
         )
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
     
-        mAP = self.total_map / self.num_samples
-        acc = self.total_acc / self.num_samples
-        top1_err = self.num_top1_mis / self.num_samples
-        top5_err = self.num_top5_mis / self.num_samples
+        # mAP = self.total_map / self.num_samples
+        # acc = self.total_acc / self.num_samples
+        top1_acc = self.num_top1_correct / self.num_samples
+        # top5_err = self.num_top5_mis / self.num_samples
         avg_loss = self.loss_total / self.num_samples
         stats = {
             "_type": "train_epoch",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "acc": acc,
-            "mAP": mAP,
-            "top1_err": top1_err,
-            "top5_err": top5_err,
+            "top1_acc": top1_acc,
             "loss": avg_loss,
             "lr": self.lr,
         }
@@ -174,15 +162,12 @@ class ValMeter(object):
         self.max_iter = max_iter
         self.iter_timer = Timer()
         # Current minibatch errors (smoothed over a window).
-        self.mb_top1_err = ScalarMeter(cfg.LOG_PERIOD)
-        self.mb_top5_err = ScalarMeter(cfg.LOG_PERIOD)
+        self.mb_top1_acc = ScalarMeter(cfg.LOG_PERIOD)
         # Min errors (over the full val set).
-        self.min_top1_err = 100.0
-        self.min_top5_err = 100.0
+        self.max_top1_acc = 0
         self.max_map = 0
-        # Number of misclassified examples.
-        self.num_top1_mis = 0
-        self.num_top5_mis = 0
+
+        self.num_top1_correct = 0
         self.num_samples = 0
         # Current mean average precision 
         self.map = ScalarMeter(cfg.LOG_PERIOD)
@@ -193,10 +178,8 @@ class ValMeter(object):
         Reset the Meter.
         """
         self.iter_timer.reset()
-        self.mb_top1_err.reset()
-        self.mb_top5_err.reset()
-        self.num_top1_mis = 0
-        self.num_top5_mis = 0
+        self.mb_top1_acc.reset()
+        self.num_top1_correct = 0
         self.num_samples = 0
         self.map.reset()
         self.total_map = 0.0
@@ -213,7 +196,7 @@ class ValMeter(object):
         """
         self.iter_timer.pause()
 
-    def update_stats_topk(self, top1_err, top5_err, mb_size):
+    def update_stats_topk(self, top1_acc, mb_size):
         """
         Update the current stats.
         Args:
@@ -221,10 +204,10 @@ class ValMeter(object):
             top5_err (float): top5 error rate.
             mb_size (int): mini batch size.
         """
-        self.mb_top1_err.add_value(top1_err)
-        self.mb_top5_err.add_value(top5_err)
-        self.num_top1_mis += top1_err * mb_size
-        self.num_top5_mis += top5_err * mb_size
+        self.mb_top1_acc.add_value(top1_acc)
+        # self.mb_top5_err.add_value(top5_err)
+        self.num_top1_correct += top1_acc * mb_size
+        # self.num_top5_mis += top5_err * mb_size
         self.num_samples += mb_size
 
     def update_stats_map(self, cur_map, mb_size):
@@ -257,9 +240,7 @@ class ValMeter(object):
             "iter": "{}/{}".format(cur_iter + 1, self.max_iter),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "mAP": self.map.get_win_median(),
-            "top1_err": self.mb_top1_err.get_win_median(),
-            "top5_err": self.mb_top5_err.get_win_median(),
+            "top1_acc": self.mb_top1_acc.get_win_median(),
         }
         _logger.log_json_stats(stats)
 
@@ -272,20 +253,14 @@ class ValMeter(object):
         """
         mAP = self.total_map / self.num_samples
         self.max_map = max(self.max_map, mAP)
-        top1_err = self.num_top1_mis / self.num_samples
-        top5_err = self.num_top5_mis / self.num_samples
-        self.min_top1_err = min(self.min_top1_err, top1_err)
-        self.min_top5_err = min(self.min_top5_err, top5_err)
+        top1_acc = self.num_top1_correct / self.num_samples
+        self.max_top1_acc = max(self.max_top1_acc, top1_acc)
         stats = {
             "_type": "val_epoch",
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
-            "top1_err": top1_err,
-            "top5_err": top5_err,
-            "min_top1_err": self.min_top1_err,
-            "min_top5_err": self.min_top5_err,
-            "mAP": mAP,
-            "max_map": self.max_map,
+            "top1_acc": top1_acc,
+            "max_top1_acc": self.max_top1_acc,
         }
         _logger.log_json_stats(stats)
 
