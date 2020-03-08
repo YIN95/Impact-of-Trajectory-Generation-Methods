@@ -61,11 +61,19 @@ class CongreG8(Dataset):
         )
 
     def __len__(self):
-        return len(self.label)
+        return len(self.label)*(self.cfg.DATA.NUM_FRAMES-1)
     
     def __getitem__(self, index):
-    
-        data_numpy = np.array(self.data[index])
-        label = self.label[index]
         
-        return data_numpy, label, index
+        data_index = int(index/(self.cfg.DATA.NUM_FRAMES-1))
+        frame_index = index - data_index*(self.cfg.DATA.NUM_FRAMES-1)
+        
+        data_numpy = np.array(self.data[data_index])
+        
+        data_input = data_numpy[:, frame_index, :, :]
+        data_input = data_input[:, np.newaxis, :, :]
+    
+        data_output = data_numpy[:, frame_index+1, :, :]
+        data_output = data_output[:, np.newaxis, :, :]
+                
+        return data_input, data_output, index

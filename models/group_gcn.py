@@ -67,5 +67,5 @@ class Group_GCN(nn.Module):
         x = self.fcn(x)
         x = x.view(x.size(0), -1)
         x = self.fc1(x)
-        
+
         return x

@@ -51,12 +51,6 @@ class STGCN(nn.Module):
             st_gcn(64, 64, kernel_size, stride=1, residual=True, dropout=dropout_rate),
             st_gcn(64, 64, kernel_size, stride=1, dropout=dropout_rate),
             st_gcn(64, 64, kernel_size, stride=1, dropout=dropout_rate),
-            st_gcn(64, 128, kernel_size, stride=2, dropout=dropout_rate),
-            st_gcn(128, 128, kernel_size, stride=1, dropout=dropout_rate),
-            st_gcn(128, 128, kernel_size, stride=1, dropout=dropout_rate),
-            st_gcn(128, 256, kernel_size, stride=2, dropout=dropout_rate),
-            st_gcn(256, 256, kernel_size, stride=1, dropout=dropout_rate),
-            st_gcn(256, 256, kernel_size, stride=1, dropout=dropout_rate),
         ))
 
         # initialize parameters for edge importance weighting
@@ -69,7 +63,7 @@ class STGCN(nn.Module):
             self.edge_importance = [1] * len(self.st_gcn_networks)
         
         # self.dp = nn.Dropout(0.5, inplace=True)
-        self.fcn = nn.Conv2d(256, hidden, kernel_size=1)
+        self.fcn = nn.Conv2d(64, hidden, kernel_size=1)
         self.fc1 = nn.Linear(hidden, outfeature)
 
     def forward(self, x):
@@ -92,7 +86,7 @@ class STGCN(nn.Module):
         x = x.view(N, M, -1, 1, 1).mean(dim=1)
 
         # prediction
-        x = self.fcn(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc1(x)
+        # x = self.fcn(x)
+        # x = x.view(x.size(0), -1)
+        # x = self.fc1(x)
         return x
