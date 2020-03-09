@@ -3,6 +3,7 @@ import torch.nn as nn
 _LOSSES = {
     "cross_entropy": nn.CrossEntropyLoss,
     "bce": nn.BCEWithLogitsLoss,
+    "mse": nn.MSELoss,
 }
 
 

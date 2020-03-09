@@ -81,12 +81,12 @@ class STGCN(nn.Module):
         for gcn, importance in zip(self.st_gcn_networks, self.edge_importance):
             x, _ = gcn(x, self.A * importance)
 
-        # global pooling
+        global pooling
         x = F.avg_pool2d(x, x.size()[2:])
         x = x.view(N, M, -1, 1, 1).mean(dim=1)
 
         # prediction
-        # x = self.fcn(x)
-        # x = x.view(x.size(0), -1)
-        # x = self.fc1(x)
+        x = self.fcn(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc1(x)
         return x

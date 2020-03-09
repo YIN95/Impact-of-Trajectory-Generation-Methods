@@ -29,15 +29,6 @@ class CongreG8(Dataset):
             self.mode, len(self.label)))
     
     def _load_data(self):
-        # path
-        # label_path = osp.join(
-        #     self.cfg.DATA_PATH,
-        #     'val_label.npy'
-        # )
-        # data_path = osp.join(
-        #     self.cfg.DATA_PATH,
-        #     'val_data.npy'
-        # )
         label_path = osp.join(
             self.cfg.DATA_PATH,
             self.mode+'_label.npy'
@@ -61,19 +52,19 @@ class CongreG8(Dataset):
         )
 
     def __len__(self):
-        return len(self.label)*(self.cfg.DATA.NUM_FRAMES-1)
+        return len(self.label)*(self.cfg.DATA.NUM_FRAMES-self.cfg.DATA.LEN_INPUT)
     
     def __getitem__(self, index):
         
-        data_index = int(index/(self.cfg.DATA.NUM_FRAMES-1))
-        frame_index = index - data_index*(self.cfg.DATA.NUM_FRAMES-1)
+        data_index = int(index/(self.cfg.DATA.NUM_FRAMES-self.cfg.DATA.LEN_INPUT))
+        frame_index = index - data_index*(self.cfg.DATA.NUM_FRAMES-self.cfg.DATA.LEN_INPUT)
         
         data_numpy = np.array(self.data[data_index])
         
-        data_input = data_numpy[:, frame_index, :, :]
-        data_input = data_input[:, np.newaxis, :, :]
+        data_input = data_numpy[:, frame_index:frame_index+self.cfg.DATA.LEN_INPUT, :, :]
+        # data_input = data_input[:, np.newaxis, :, :]
     
-        data_output = data_numpy[:, frame_index+1, :, :]
-        data_output = data_output[:, np.newaxis, :, :]
-                
+        data_output = data_numpy[[0, 2], frame_index+self.cfg.DATA.LEN_INPUT, 5, 0]
+        # data_output_z = data_numpy[2, frame_index+self.cfg.DATA.LEN_INPUT, 5, 0]
+        # data_output = [data_output_x, data_output_z]
         return data_input, data_output, index

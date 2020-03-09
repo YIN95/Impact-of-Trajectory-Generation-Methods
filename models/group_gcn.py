@@ -29,6 +29,7 @@ class Group_GCN(nn.Module):
         self.st_gcn_networks = nn.ModuleList((
             st_gcn(in_channels, 64, kernel_size, stride=1, residual=False, dropout=0),
             st_gcn(64, 64, kernel_size, stride=1, residual=True, dropout=0),
+            st_gcn(64, 64, kernel_size, stride=1, residual=True, dropout=0),
         ))
         
         # initialize parameters for edge importance weighting

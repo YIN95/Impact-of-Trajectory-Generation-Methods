@@ -5,6 +5,7 @@ from configs.config import get_config
 from trainer import train
 from tester import test
 
+
 def main():
     """
     Main function to spawn the train and test process.

@@ -23,7 +23,7 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg, tra
         # print(cur_iter)
         #if train with RL
         inputs = inputs.float().cuda()
-        labels = labels.cuda()
+        labels = labels.float().cuda()
 
         if cfg.MODEL.LOSS_FUNC == "cross_entropy":
             labels = labels.long()
@@ -39,28 +39,28 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg, tra
 
         # Compute the loss.
         loss = loss_fun(preds, labels)
-        
+
         # Perform the backward pass.
         optimizer.zero_grad()
         loss.backward()
         # Update the parameters.
         optimizer.step()
         
-        num_topks_correct = metrics.topks_correct(preds, labels, (1,))
-        top1_acc = (num_topks_correct[0] / preds.size(0)) * 100.0
+        # num_topks_correct = metrics.topks_correct(preds, labels, (1,))
+        # top1_acc = (num_topks_correct[0] / preds.size(0)) * 100.0
     
         if cfg.NUM_GPUS > 1:
-            loss, top1_acc = dist.all_reduce([loss, top1_acc])
+            loss = dist.all_reduce([loss])
         
-        loss, top1_acc = loss.item(), top1_acc.item()
+        loss = loss.item()
 
         tflogger.add_scalar("loss",loss, train_size*cur_epoch+cur_iter)
-        tflogger.add_scalar("train_top1_acc",top1_acc, train_size*cur_epoch+cur_iter)
+        # tflogger.add_scalar("train_top1_acc",top1_acc, train_size*cur_epoch+cur_iter)
 
         train_meter.iter_toc()
         # Update and log stats.
         train_meter.update_stats_topk(
-            top1_acc, loss, lr, inputs.size(0) * cfg.NUM_GPUS
+            loss, lr, inputs.size(0) * cfg.NUM_GPUS
         )
         train_meter.log_iter_stats(cur_epoch, cur_iter)
         
@@ -92,18 +92,18 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, val_size):
         loss = loss_fun(preds, labels)
         
         # Compute the mAP of current mb.
-        num_topks_correct = metrics.topks_correct(preds, labels, (1,))
-        top1_acc = (num_topks_correct[0] / preds.size(0)) * 100.0
+        # num_topks_correct = metrics.topks_correct(preds, labels, (1,))
+        # top1_acc = (num_topks_correct[0] / preds.size(0)) * 100.0
     
         if cfg.NUM_GPUS > 1:
-            loss, top1_acc = dist.all_reduce([loss, top1_acc])
+            loss = dist.all_reduce([loss])
         
-        loss, top1_acc = loss.item(), top1_acc.item()
+        loss = loss.item()
         
         val_meter.iter_toc()
         # Update and log stats.
         val_meter.update_stats_topk(
-            top1_acc, inputs.size(0) * cfg.NUM_GPUS
+            loss, inputs.size(0) * cfg.NUM_GPUS
         )
         val_meter.log_iter_stats(cur_epoch, cur_iter)
         val_meter.iter_tic()
@@ -161,7 +161,7 @@ def train(cfg):
 
     # Build meters
     train_meter = metrics.TrainMeter(train_size, cfg)
-    val_meter = metrics.ValMeter(val_size, cfg)
+    val_meter = metrics.TrainMeter(val_size, cfg)
 
     # Start training
     logger.info("Start epoch: {}".format(start_epoch + 1))

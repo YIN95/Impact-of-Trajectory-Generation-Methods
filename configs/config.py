@@ -253,6 +253,8 @@ _C.DATA = CfgNode()
 
 _C.DATA.NUM_FRAMES = 32
 
+_C.DATA.LEN_INPUT = 2
+
 _C.DATA.SAMPLING_RATE = 4
 
 _C.DATA.SQUARE_SCALE = True
@@ -309,7 +311,7 @@ def check_config(cfg):
     assert cfg.TEST.BATCH_SIZE % cfg.NUM_GPUS == 0
 
     # MODEL assertions
-    assert cfg.MODEL.LOSS_FUNC in ["bce","cross_entropy"]
+    assert cfg.MODEL.LOSS_FUNC in ["bce","cross_entropy","mse"]
     
 
 def get_config(cfg_path, opts):

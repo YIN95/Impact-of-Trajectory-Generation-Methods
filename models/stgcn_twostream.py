@@ -39,7 +39,8 @@ class STGCN_2STREAM(nn.Module):
             allBodyOutputs.append(groupBodyOutput)
 
         allGroupData = torch.stack(allBodyOutputs, dim=2)
-        allGroupData = allGroupData.permute(0, 2, 1).contiguous()
+        
+        # allGroupData = allGroupData.permute(0, 2, 1).contiguous()
 
         allGroupData = allGroupData.reshape((N, 16, 1, 4, 1))
         out = self.gcn(allGroupData)

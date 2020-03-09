@@ -23,7 +23,7 @@ def multi_view_test(test_loader, model, test_meter, cfg):
         
         # Transfer the data to the current GPU device.
         inputs = inputs.float().cuda()
-        labels = labels.cuda()
+        labels = labels.float().cuda()
         video_idx = video_idx.cuda()
         
         # Perform the forward pass.

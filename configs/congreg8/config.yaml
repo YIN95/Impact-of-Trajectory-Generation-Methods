@@ -15,7 +15,7 @@ STGCN:
 TRAIN:
   ENABLE: True
   DATASET: congreg8
-  BATCH_SIZE: 8
+  BATCH_SIZE: 96
   EVAL_PERIOD: 1
   CHECKPOINT_PERIOD: 1
   RESUME: False
@@ -27,6 +27,7 @@ TEST:
   LOAD_PATH: checkpoints/slowfast/checkpoint_epoch_00000.pth.tar
 DATA:
   NUM_FRAMES: 60
+  LEN_INPUT: 30
   INPUT_CHANNEL_NUM: [3]
 SOLVER:
   BASE_LR: 0.1
@@ -42,7 +43,7 @@ MODEL:
   NUM_CLASSES: 2
   DROPOUT_RATE: 0.5
   ARCH: stgcn
-  LOSS_FUNC: cross_entropy
+  LOSS_FUNC: mse
 DATA_LOADER:
   NUM_WORKERS: 4
   PIN_MEMORY: True

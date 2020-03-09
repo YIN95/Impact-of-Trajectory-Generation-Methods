@@ -65,7 +65,7 @@ class TrainMeter(object):
         """
         self.iter_timer.pause()
     
-    def update_stats_topk(self, top1_acc, loss, lr, mb_size):
+    def update_stats_topk(self, loss, lr, mb_size):
         """
         Update the current stats.
         Args:
@@ -76,11 +76,11 @@ class TrainMeter(object):
             mb_size (int): mini batch size.
         """
         # Current minibatch stats
-        self.mb_top1_acc.add_value(top1_acc)
+        # self.mb_top1_acc.add_value(top1_acc)
         self.loss.add_value(loss)
         self.lr = lr
         # Aggregate stats
-        self.num_top1_correct += top1_acc * mb_size
+        # self.num_top1_correct += top1_acc * mb_size
         self.loss_total += loss * mb_size
         self.num_samples += mb_size
 
@@ -113,7 +113,7 @@ class TrainMeter(object):
             "iter": "{}/{}".format(cur_iter + 1, self.epoch_iters),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "top1_acc": self.mb_top1_acc.get_win_median(),
+            # "top1_acc": self.mb_top1_acc.get_win_median(),
             "loss": self.loss.get_win_median(),
             "lr": self.lr,
         }
@@ -132,7 +132,7 @@ class TrainMeter(object):
     
         # mAP = self.total_map / self.num_samples
         # acc = self.total_acc / self.num_samples
-        top1_acc = self.num_top1_correct / self.num_samples
+        # top1_acc = self.num_top1_correct / self.num_samples
         # top5_err = self.num_top5_mis / self.num_samples
         avg_loss = self.loss_total / self.num_samples
         stats = {
@@ -140,7 +140,6 @@ class TrainMeter(object):
             "epoch": "{}/{}".format(cur_epoch + 1, self._cfg.SOLVER.MAX_EPOCH),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "top1_acc": top1_acc,
             "loss": avg_loss,
             "lr": self.lr,
         }
@@ -196,18 +195,22 @@ class ValMeter(object):
         """
         self.iter_timer.pause()
 
-    def update_stats_topk(self, top1_acc, mb_size):
+    def update_stats_topk(self, loss, mb_size):
         """
         Update the current stats.
         Args:
             top1_err (float): top1 error rate.
             top5_err (float): top5 error rate.
+            loss (float): loss value.
+            lr (float): learning rate.
             mb_size (int): mini batch size.
         """
-        self.mb_top1_acc.add_value(top1_acc)
-        # self.mb_top5_err.add_value(top5_err)
-        self.num_top1_correct += top1_acc * mb_size
-        # self.num_top5_mis += top5_err * mb_size
+        # Current minibatch stats
+        # self.mb_top1_acc.add_value(top1_acc)
+        self.loss.add_value(loss)
+        # Aggregate stats
+        # self.num_top1_correct += top1_acc * mb_size
+        self.loss_total += loss * mb_size
         self.num_samples += mb_size
 
     def update_stats_map(self, cur_map, mb_size):
@@ -221,7 +224,7 @@ class ValMeter(object):
         self.map.add_value(cur_map)
         self.total_map += cur_map*mb_size
         self.num_samples += mb_size
-
+          
     def log_iter_stats(self, cur_epoch, cur_iter):
         """
         log the stats of the current iteration.
@@ -240,7 +243,7 @@ class ValMeter(object):
             "iter": "{}/{}".format(cur_iter + 1, self.max_iter),
             "time_diff": self.iter_timer.seconds(),
             "eta": eta,
-            "top1_acc": self.mb_top1_acc.get_win_median(),
+            "loss": self.loss.get_win_median(),
         }
         _logger.log_json_stats(stats)
 
