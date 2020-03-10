@@ -51,8 +51,8 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg, tra
     
         if cfg.NUM_GPUS > 1:
             loss = dist.all_reduce([loss])
-        
-        loss = loss.item()
+        print(loss)
+        loss = loss[0].item()
 
         tflogger.add_scalar("loss",loss, train_size*cur_epoch+cur_iter)
         # tflogger.add_scalar("train_top1_acc",top1_acc, train_size*cur_epoch+cur_iter)
