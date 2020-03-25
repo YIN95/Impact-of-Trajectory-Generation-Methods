@@ -81,7 +81,7 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, val_size):
         
         # if eval with RL
         inputs = inputs.float().cuda()
-        labels = labels.cuda()
+        labels = labels.float().cuda()
 
         # Perform the forward pass.
         preds = model(inputs)
