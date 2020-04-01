@@ -1,0 +1,49 @@
+TASK: 1
+NUM_GPUS: 4
+RNG_SEED: 0
+CHECKPOINT_DIR: checkpoints/
+LOG_DIR: logs/
+LOG_PERIOD: 1
+DATA_PATH: '/local_storage/datasets/wyin/CongreG8/'
+STGCN:
+  LAYOUT: 'congreg8-marker'
+  STRATEGY: 'spatial'
+  EDGE_IMPORTANCE: True
+  HIDDEN_FEATURES: 32
+  OUT_FEATURES: 16
+  TEMPORAL_KERNEL_SIZE: 9
+TRAIN:
+  ENABLE: True
+  DATASET: congreg8
+  BATCH_SIZE: 256
+  EVAL_PERIOD: 1
+  CHECKPOINT_PERIOD: 1
+  RESUME: False
+  LOAD_PATH: resume/path
+TEST:
+  ENABLE: False
+  DATASET: cater
+  BATCH_SIZE: 16
+  LOAD_PATH: checkpoints/slowfast/checkpoint_epoch_00000.pth.tar
+DATA:
+  NUM_FRAMES: 60
+  LEN_INPUT: 30
+  INPUT_CHANNEL_NUM: [3]
+SOLVER:
+  BASE_LR: 0.1
+  LR_POLICY: cosine
+  WARMUP_EPOCH: 10
+  MULTI_STEP: [35, 60, 90]
+  MAX_EPOCH: 210
+  MOMENTUM: 0.9
+  WEIGHT_DECAY: 1e-4
+  WARMUP_START_LR: 0.001
+  OPTIMIZING_METHOD: sgd
+MODEL:
+  NUM_CLASSES: 2
+  DROPOUT_RATE: 0.5
+  ARCH: stgcn
+  LOSS_FUNC: mse
+DATA_LOADER:
+  NUM_WORKERS: 4
+  PIN_MEMORY: True
