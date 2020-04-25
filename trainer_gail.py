@@ -9,14 +9,24 @@ import utils.metrics as metrics
 import utils.losses as losses
 import utils.optimizer as optim
 import utils.logger as _logger 
+from models.value import Value
+from models.discriminator import Discriminator
 
 logger = _logger.get_logger(__name__)
 
 
-def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg, train_size, tflogger):
+def expert_reward(state, action):
+    state_action = tensor(np.hstack([state, action]), dtype=dtype)
+    with torch.no_grad():
+        return -math.log(discrim_net(state_action)[0].item())
+    
+def train_epoch(train_loader, policy_net, value_net, 
+                optimizer_policy, optimizer_value, optimizer_discrim, 
+                train_meter, cur_epoch, cfg, train_size, tflogger):
     
     # Enable train mode.
-    model.train()
+    policy_net.train()
+    value_net.train()
     train_meter.iter_tic()
     
     for cur_iter, (inputs, labels, _) in enumerate(train_loader):
@@ -24,16 +34,28 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg, tra
         #if train with RL
         inputs = inputs.float().cuda()
         labels = labels.float().cuda()
-
-        # if cfg.MODEL.LOSS_FUNC == "cross_entropy":
-        #     labels = labels.long()
-            
+        
         # Update the learning rate.
         lr = optim.get_cur_lr(cur_epoch + float(cur_iter) / train_size, cfg)
-        optim.set_lr(optimizer, lr)
+        optim.set_lr(optimizer_policy, lr)
+        optim.set_lr(optimizer_value, lr)
         
         # Perform the forward pass.
-        preds = model(inputs, labels[0, :, 0])
+        states, actions, rewards, masks = policy_net(inputs, labels[0, :, 0])
+
+        states = torch.cat(states, axis=0)
+        actions = torch.cat(actions, axis=0)
+        rewards = torch.cat(rewards, axis=0)
+        masks = torch.from_numpy(np.stack(masks).reshape(-1, 1)).cuda()
+
+
+        with torch.no_grad():
+            values = value_net(states)
+        
+        truth = labels.permute(0, 2, 1).contiguous()
+        action = action.view(1, len(action), 2)
+        
+
         # Explicitly declare reduction to mean.
         loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)()
 
@@ -69,52 +91,10 @@ def train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg, tra
     # Log epoch stats.
     train_meter.log_epoch_stats(cur_epoch)
     train_meter.reset()
-
-
-@torch.no_grad()
-def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, val_size):
-    # Enable train mode.
-    model.eval()
-    val_meter.iter_tic()
     
-    for cur_iter, (inputs, labels, _) in enumerate(val_loader):
-        
-        # if eval with RL
-        inputs = inputs.float().cuda()
-        labels = labels.float().cuda()
-
-        # Perform the forward pass.
-        preds = model(inputs, labels[0, :, 0])
-        
-        loss_fun = losses.get_loss_func(cfg.MODEL.LOSS_FUNC)()
-
-        # Compute the loss.
-        loss = loss_fun(preds, labels)
-        
-        # Compute the mAP of current mb.
-        # num_topks_correct = metrics.topks_correct(preds, labels, (1,))
-        # top1_acc = (num_topks_correct[0] / preds.size(0)) * 100.0
     
-        if cfg.NUM_GPUS > 1:
-            loss = dist.all_reduce([loss])
-        
-        loss = loss.item()
-        
-        val_meter.iter_toc()
-        # Update and log stats.
-        val_meter.update_stats_topk(
-            loss, inputs.size(0) * cfg.NUM_GPUS
-        )
-        val_meter.log_iter_stats(cur_epoch, cur_iter)
-        val_meter.iter_tic()
     
-    # Log epoch stats.
-    val_meter.log_epoch_stats(cur_epoch)
-    val_meter.reset()
-
-
-def train(cfg):
-    
+def main_loop(cfg):
     # set seed
     torch.cuda.manual_seed(cfg.RNG_SEED)
 
@@ -128,32 +108,26 @@ def train(cfg):
     tflogger = _logger.TFLogger(cfg)
 
     # Build model and print model info
-    model = model_builder(cfg).cuda(device=torch.cuda.current_device())
+    policy_net = model_builder(cfg).cuda(device=torch.cuda.current_device())
+    value_net = Value(32).cuda(device=torch.cuda.current_device())
+    # discrim_net = Discriminator(128).cuda(device=torch.cuda.current_device())
 
     if cfg.NUM_GPUS > 1:
-        model = torch.nn.parallel.DistributedDataParallel(
-            module=model, 
+        policy_net = torch.nn.parallel.DistributedDataParallel(
+            module=policy_net, 
             device_ids=[torch.cuda.current_device()], 
             output_device=torch.cuda.current_device()
         )
     
     if dist.is_master_proc(cfg.NUM_GPUS):
-        log_model_info(model)
+        log_model_info(policy_net)
         
     # Build optimizer
-    optimizer = optim.optimizer_builder(model, cfg)
+    optimizer_policy = optim.optimizer_builder(policy_net, cfg)
+    optimizer_value = optim.optimizer_builder(policy_net, cfg)
+    optimizer_discrim = optim.optimizer_builder(policy_net, cfg)
     
-    # Resume
     start_epoch = 0
-    if cfg.TRAIN.RESUME:
-        if cfg.TRAIN.LOAD_PATH != "":
-            checkpoint_epoch = load_checkpoint(
-                cfg.TRAIN.LOAD_PATH,
-                model,
-                cfg.NUM_GPUS > 1,
-                optimizer
-            )
-            start_epoch = checkpoint_epoch + 1
     
     # Build loader
     train_loader, train_size = loader_builder(cfg, 'train') 
@@ -162,7 +136,7 @@ def train(cfg):
     # Build meters
     train_meter = metrics.TrainMeter(train_size, cfg)
     val_meter = metrics.TrainMeter(val_size, cfg)
-
+    
     # Start training
     logger.info("Start epoch: {}".format(start_epoch + 1))
 
@@ -172,14 +146,18 @@ def train(cfg):
         shuffle_loader(train_loader, cur_epoch, cfg)
         
         # Train the model
-        train_epoch(train_loader, model, optimizer, train_meter, cur_epoch, cfg, train_size, tflogger)
+        train_epoch(train_loader, policy_net, value_net, 
+                    optimizer_policy, optimizer_value, optimizer_discrim, 
+                    train_meter, cur_epoch, cfg, train_size, tflogger)
 
         # Save checkpoint
         if is_checkpoint_epoch(cur_epoch, cfg.TRAIN.CHECKPOINT_PERIOD):
-            save_checkpoint(cfg.CHECKPOINT_DIR, model, optimizer, cur_epoch, cfg)
+            save_checkpoint(cfg.CHECKPOINT_DIR, policy_net, optimizer, cur_epoch, cfg)
         
-        # Evaluate the model on validation set.
-        if is_eval_epoch(cur_epoch, cfg.TRAIN.EVAL_PERIOD, cfg.SOLVER.MAX_EPOCH):
-            eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, val_size)
+        # # Evaluate the model on validation set.
+        # if is_eval_epoch(cur_epoch, cfg.TRAIN.EVAL_PERIOD, cfg.SOLVER.MAX_EPOCH):
+        #     eval_epoch(val_loader, policy_net, val_meter, cur_epoch, cfg, val_size)
     
     tflogger.close()
+
+

@@ -9,6 +9,11 @@ import utils.metrics as metrics
 import utils.losses as losses
 import utils.optimizer as optim
 import utils.logger as _logger 
+from utils.ppo import ppo_step
+from models.value import Value
+from models.discriminator import Discriminator
+from models.value import Value
+from models.policy import Policy_net
 
 logger = _logger.get_logger(__name__)
 
@@ -56,35 +61,24 @@ def test(cfg):
     logger.info(cfg)
 
     # Build model and print model info
-    model = model_builder(cfg).cuda(device=torch.cuda.current_device())
+    Policy = Policy_net(cfg).cuda(device=torch.cuda.current_device())
     
-    if cfg.NUM_GPUS > 1:
-        model = torch.nn.parallel.DistributedDataParallel(
-            module=model, 
-            device_ids=[torch.cuda.current_device()], 
-            output_device=torch.cuda.current_device()
-        )
-
     # Load checkpoint
     load_checkpoint(
         cfg.TEST.LOAD_PATH,
-        model,
+        Policy,
         cfg.NUM_GPUS > 1,
         None,
     )
 
     # Build loader
-    test_loader, test_size = loader_builder(cfg, 'test')
+    val_loader, val_size = loader_builder(cfg, 'val')
+    Policy.eval()
 
-    # Build meters
-    test_meter = metrics.TestMeter(
-        len(test_loader.dataset)
-        // (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS),
-        cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS,
-        cfg.MODEL.NUM_CLASSES,
-        test_size,
-    )
-
-    logger.info("Testing model for {} iterations".format(len(test_loader)))
-
-    multi_view_test(test_loader, model, test_meter, cfg)
+    for cur_iter, (inputs, labels, _) in enumerate(val_loader):
+        logger.info("cur_iter: {}".format(cur_iter + 1))
+        inputs = inputs.float().cuda()
+        labels = labels.float().cuda()
+        states, actions = Policy(inputs, labels[0, :, 0])
+        print(actions)
+        

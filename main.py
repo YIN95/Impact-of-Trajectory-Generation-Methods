@@ -4,7 +4,8 @@ import utils.multiprocess as mpu
 from configs.config import get_config
 from trainer import train
 from tester import test
-
+from trainer_gail import main_loop
+from run_gail import main_gail_loop
 
 def main():
     """
@@ -41,6 +42,7 @@ def main():
 
     cfg = get_config(args.cfg_file, args.opts)
 
+    test(cfg)
     # Perform training
     if cfg.TRAIN.ENABLE:
         if cfg.NUM_GPUS > 1:
@@ -49,7 +51,7 @@ def main():
                 nprocs=cfg.NUM_GPUS,
                 args=(
                     cfg.NUM_GPUS,
-                    train,
+                    main_loop,
                     args.ip,
                     cfg.SHARD_ID,       # default: 0 
                     cfg.NUM_SHARDS,     # default: 1
@@ -59,27 +61,7 @@ def main():
                 daemon=False,
             )
         else:
-            train(cfg)
-    
-    # Perform testing.
-    if cfg.TEST.ENABLE:
-        if cfg.NUM_GPUS > 1:
-            torch.multiprocessing.spawn(
-                mpu.run,
-                nprocs=cfg.NUM_GPUS,
-                args=(
-                    cfg.NUM_GPUS,
-                    test,
-                    args.ip,
-                    cfg.SHARD_ID,
-                    cfg.NUM_SHARDS,
-                    cfg.DIST_BACKEND,
-                    cfg,
-                ),
-                daemon=False,
-            )
-        else:
-            test(cfg)
+            main_gail_loop(cfg)
             
 if __name__ == "__main__":
     

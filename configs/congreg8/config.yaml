@@ -10,7 +10,7 @@ STGCN:
   STRATEGY: 'spatial'
   EDGE_IMPORTANCE: True
   HIDDEN_FEATURES: 32
-  OUT_FEATURES: 16
+  OUT_FEATURES: 8
   TEMPORAL_KERNEL_SIZE: 9
 TRAIN:
   ENABLE: True
@@ -24,10 +24,8 @@ TEST:
   ENABLE: False
   DATASET: cater
   BATCH_SIZE: 1
-  LOAD_PATH: checkpoints/slowfast/checkpoint_epoch_00000.pth.tar
+  LOAD_PATH: checkpoints/checkpoint_epoch_00000.pth.tar
 DATA:
-  NUM_FRAMES: 60
-  LEN_INPUT: 30
   INPUT_CHANNEL_NUM: [3]
 SOLVER:
   BASE_LR: 0.1
@@ -38,11 +36,11 @@ SOLVER:
   MOMENTUM: 0.9
   WEIGHT_DECAY: 1e-4
   WARMUP_START_LR: 0.001
-  OPTIMIZING_METHOD: sgd
+  OPTIMIZING_METHOD: adam
 MODEL:
   NUM_CLASSES: 2
   DROPOUT_RATE: 0.5
-  ARCH: stgcn
+  ARCH: gail
   LOSS_FUNC: mse
 DATA_LOADER:
   NUM_WORKERS: 4

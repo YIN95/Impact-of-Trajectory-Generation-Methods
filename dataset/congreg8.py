@@ -8,20 +8,22 @@ import random
 import torch
 from glob import glob
 from . import utils
+import pickle as pkl
 import utils.logger as _logger
 
 logger = _logger.get_logger(__name__)
 
 class CongreG8(Dataset):
     def __init__(self, cfg, mode='train'):
-
+        self.M = 1
+        self.N = 1
         # Only support train, val, and test mode.
         assert mode in ["train", "val"], \
             "Split '{}' not supported for CongreG8".format(mode)
 
         self.mode = mode
         self.cfg = cfg
-        self.ext = ["npy"]
+        self.ext = ["pkl"]
         
         logger.info("Load CongreG8 {}...".format(mode))
         self._load_data()
@@ -29,42 +31,43 @@ class CongreG8(Dataset):
             self.mode, len(self.label)))
     
     def _load_data(self):
-        label_path = osp.join(
-            self.cfg.DATA_PATH,
-            self.mode+'_label.npy'
-        )
+        
         data_path = osp.join(
             self.cfg.DATA_PATH,
-            self.mode+'_data.npy'
+            self.mode+'_data.pkl'
         )
-
-        # load
-        self.label = np.load(label_path)
-        self.data = np.load(data_path, mmap_mode='r+')
         
-        self.N, self.C, self.T, self.V, self.M = self.data.shape
-        self.M = 1
-
-        assert (
-            len(self.label) == self.N
-        ), "Failed to load congreg8 split {} from {}".format(
-            self.mode, self.cfg.DATA_PATH
+        label_path = osp.join(
+            self.cfg.DATA_PATH,
+            self.mode+'_label.pkl'
         )
+        
+        # load
+        file = open(data_path, 'rb')
+        self.data = pkl.load(file)
+        file.close()
+
+        file = open(label_path, 'rb')
+        self.label = pkl.load(file)
+        file.close()
+        
+        # self.N, self.C, self.T, self.V, self.M = self.data.shape
+        # self.M = 1
 
     def __len__(self):
-        return len(self.label)*(self.cfg.DATA.NUM_FRAMES-self.cfg.DATA.LEN_INPUT)
+        return len(self.label)
     
     def __getitem__(self, index):
+            
+        data_input = np.array(self.data[index][0])
+        data_output = np.array(self.label[index])
+        data_output = data_output[:, 0, :]
+        # data_output_v = data_output.copy()
+
+        # for i in range(data_output.shape[1]-1):
+        #     data_output_v[:, i+1] =  data_output[:,i+1]-data_output[:,i]
+
+        # data_output = data_output.swapaxes(0,1)
+        self.C, self.T, self.V, _ = data_input.shape
         
-        data_index = int(index/(self.cfg.DATA.NUM_FRAMES-self.cfg.DATA.LEN_INPUT))
-        frame_index = index - data_index*(self.cfg.DATA.NUM_FRAMES-self.cfg.DATA.LEN_INPUT)
-        
-        data_numpy = np.array(self.data[data_index])
-        
-        data_input = data_numpy[:, frame_index:frame_index+self.cfg.DATA.LEN_INPUT, :, :]
-        # data_input = data_input[:, np.newaxis, :, :]
-    
-        data_output = data_numpy[[0, 2], frame_index+self.cfg.DATA.LEN_INPUT, 5, 0]
-        # data_output_z = data_numpy[2, frame_index+self.cfg.DATA.LEN_INPUT, 5, 0]
-        # data_output = [data_output_x, data_output_z]
         return data_input, data_output, index
