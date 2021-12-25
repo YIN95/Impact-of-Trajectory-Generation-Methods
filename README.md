@@ -29,6 +29,8 @@ This game involves three players in a group. In every game round, each player is
 2. Approaching Direction
 3. Camera viewpoints: a) egocentric view b) perspective view
 
+![network](https://github.com/YIN95/Impact-of-Trajectory-Generation-Methods/blob/master/media/image6.png)
+
 ## Methods
 1. WoZ
 In the WoZ (Wizard-of-Oz) approach, the robot is teleoperated by a human operator (a researcher who is a trained operator).
