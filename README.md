@@ -21,6 +21,8 @@ To explore our research questions, we designed an exploratory scenario, Who’s 
 
 This game involves three players in a group. In every game round, each player is given a card with a word on it. The Spy has a different word card. The players take turns to describe the word and the robot approaches to join the group to identify the spy.
 
+![network](https://github.com/YIN95/Impact-of-Trajectory-Generation-Methods/blob/master/media/image1.png)
+
 ## Experimental Conditions
 
 1. Group type: a) static b) quasi-dynamic [1]
