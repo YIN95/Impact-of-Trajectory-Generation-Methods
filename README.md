@@ -35,16 +35,17 @@ This game involves three players in a group. In every game round, each player is
 1. WoZ
 In the WoZ (Wizard-of-Oz) approach, the robot is teleoperated by a human operator (a researcher who is a trained operator).
 
+![network](https://github.com/YIN95/Impact-of-Trajectory-Generation-Methods/blob/master/media/image9.png)
 
 2. Procedural Model
 We use the social-aware navigation method as a procedural model to generate approaching group trajectories
 
+![network](https://github.com/YIN95/Impact-of-Trajectory-Generation-Methods/blob/master/media/image5.png)
 
 3. Imitation Learning Model
 We generate approaching group trajectories use a Generative Adversarial Imitation Learning (GAIL) framework with a Group Behavior Recognition framework.
 
-
-
+![network](https://github.com/YIN95/Impact-of-Trajectory-Generation-Methods/blob/master/media/image2.png)
 
 
 
